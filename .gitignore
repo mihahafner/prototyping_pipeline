@@ -6,3 +6,6 @@ __pycache__/
 
 # Generated site (let the action own index.html)
 docs/index.html
+
+
+Add config + workflow + pins
