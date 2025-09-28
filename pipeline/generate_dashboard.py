@@ -1,7 +1,5 @@
 # pipeline/generate_dashboard.py
-import os
-import sys
-import json
+import os, sys, json
 import numpy as np
 import pandas as pd
 from datetime import datetime, timezone
@@ -35,7 +33,6 @@ def load_config():
         return defaults
     with open(CONFIG_PATH, "r") as f:
         cfg = yaml.safe_load(f) or {}
-    # merge shallowly
     out = defaults | {k: cfg.get(k, defaults[k]) for k in defaults}
     out["mesh"] = defaults["mesh"] | (cfg.get("mesh") or {})
     return out
@@ -81,12 +78,15 @@ def load_mesh_from_config(mesh_cfg):
         if not path:
             raise ValueError("mesh.type is 'file' but mesh.file_path is empty.")
         try:
-            import trimesh  # optional; not in requirements by default
+            import trimesh
         except ImportError as e:
             raise RuntimeError("trimesh not installed. Add 'trimesh>=4.4' to requirements.txt") from e
-        m = trimesh.load(path, force='mesh')
-        if m.faces.ndim != 2 or m.faces.shape[1] != 3:
-            m = m.triangles
+        if path.startswith(("http://", "https://")):
+            m = trimesh.load_remote(path)   # allow URL loading
+        else:
+            m = trimesh.load(path, force='mesh')
+        if not hasattr(m, "vertices") or not hasattr(m, "faces") or len(m.vertices) == 0:
+            raise RuntimeError("Loaded mesh is empty.")
         x, y, z = m.vertices[:,0], m.vertices[:,1], m.vertices[:,2]
         I, J, K = m.faces[:,0], m.faces[:,1], m.faces[:,2]
         return x, y, z, I, J, K
@@ -106,44 +106,29 @@ def make_metrics(n_days=30):
 def build_dashboard_html(cfg, out_path="docs/index.html"):
     log(f"Config: {json.dumps(cfg, indent=2)}")
     x, y, z, I, J, K = load_mesh_from_config(cfg["mesh"])
-
     labels = cluster_vertices_kmeans(x, y, z, n_clusters=cfg["clusters"], seed=cfg["seed"])
     intensity = labels.astype(float)
 
     metrics = make_metrics(cfg["metrics_days"])
-    cluster_counts = pd.Series(labels).value_counts().sort_index()
-    cluster_df = pd.DataFrame({"cluster": cluster_counts.index.astype(str),
-                               "count": cluster_counts.values})
+    cluster_df = pd.Series(labels).value_counts().sort_index().rename_axis("cluster").reset_index(name="count")
 
     fig = make_subplots(
         rows=2, cols=2,
-        specs=[
-            [{"type": "scene", "rowspan": 2}, {"type": "xy"}],
-            [None, {"type": "xy"}],
-        ],
-        column_widths=[0.6, 0.4],
-        row_heights=[0.55, 0.45],
+        specs=[[{"type": "scene", "rowspan": 2}, {"type": "xy"}],
+               [None, {"type": "xy"}]],
+        column_widths=[0.6, 0.4], row_heights=[0.55, 0.45],
         subplot_titles=("3D Model (clusters)", "Metric (last 30d)", "Cluster sizes")
     )
 
-    fig.add_trace(
-        go.Mesh3d(x=x, y=y, z=z, i=I, j=J, k=K, intensity=intensity, showscale=False, name="mesh"),
-        row=1, col=1
-    )
+    fig.add_trace(go.Mesh3d(x=x, y=y, z=z, i=I, j=J, k=K, intensity=intensity, showscale=False), row=1, col=1)
     fig.update_scenes(aspectmode="data", camera=dict(eye=dict(x=1.6, y=1.6, z=1.0)), row=1, col=1)
-
-    fig.add_trace(
-        go.Scatter(x=metrics["date"], y=metrics["value"], mode="lines+markers", name="metric"),
-        row=1, col=2
-    )
-
-    fig.add_trace(go.Bar(x=cluster_df["cluster"], y=cluster_df["count"], name="clusters"), row=2, col=2)
+    fig.add_trace(go.Scatter(x=metrics["date"], y=metrics["value"], mode="lines+markers", name="metric"), row=1, col=2)
+    fig.add_trace(go.Bar(x=cluster_df["cluster"].astype(str), y=cluster_df["count"], name="clusters"), row=2, col=2)
 
     fig.update_layout(
         title=f"{cfg['dashboard_title']} — last run: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} • K-Means on vertices",
         height=850, margin=dict(l=10, r=10, t=60, b=10),
     )
-
     pio.write_html(fig, file=out_path, include_plotlyjs="cdn", full_html=True)
     log(f"Wrote {out_path}")
 

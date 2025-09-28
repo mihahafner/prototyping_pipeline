@@ -1,8 +1,7 @@
-dashboard_title: "AI Pipeline Demo"
-clusters: 5          # try 5 for more color segments
 mesh:
-  type: "file"       # ← switch from "torus" to "file"
-  file_path: "data/bunny.obj"   # path relative to repo root
-  # the rest are ignored for file type
+  type: "file"
+  file_path: "data/bunny.obj"
+clusters: 5
+dashboard_title: "AI Pipeline Demo"
 metrics_days: 30
 seed: 42
