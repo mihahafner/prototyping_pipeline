@@ -1,12 +1,8 @@
-# Pipeline settings you can tweak without editing code
 dashboard_title: "AI Pipeline Demo"
-clusters: 4
+clusters: 5          # try 5 for more color segments
 mesh:
-  type: "torus"          # torus | sphere | file
-  R: 3.0                 # torus major radius
-  r: 1.0                 # torus minor radius
-  nu: 100                # torus u resolution
-  nv: 80                 # torus v resolution
-  file_path: ""          # used when type: file (path under data/ or URL)
+  type: "file"       # ← switch from "torus" to "file"
+  file_path: "data/bunny.obj"   # path relative to repo root
+  # the rest are ignored for file type
 metrics_days: 30
 seed: 42
