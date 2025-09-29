@@ -1,7 +1,7 @@
 mesh:
   type: "file"
   file_path: "data/bunny.obj"
-clusters: 5
-dashboard_title: "AI Pipeline Demo"
-metrics_days: 30
-seed: 42
+#clusters: 5
+#dashboard_title: "AI Pipeline Demo"
+#metrics_days: 30
+#seed: 42
